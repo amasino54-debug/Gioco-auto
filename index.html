@@ -2,11 +2,10 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Car Game ULTRA</title>
+<title>Car Game LEVELS</title>
 <style>
 body { margin: 0; overflow: hidden; background: #222; font-family: Arial; }
 
-/* MENU */
 #menu {
     position: absolute;
     width: 100%;
@@ -43,7 +42,7 @@ canvas { display: none; }
 
 #restartBtn {
     position: absolute;
-    top: 50%;
+    top: 60%;
     left: 50%;
     transform: translate(-50%, -50%);
     display: none;
@@ -53,7 +52,7 @@ canvas { display: none; }
 <body>
 
 <div id="menu">
-    <h1>🚗 CAR GAME ULTRA</h1>
+    <h1>🚗 CAR GAME LEVELS</h1>
     <p id="bestText">Record: 0</p>
 
     <div class="cars">
@@ -82,6 +81,7 @@ canvas.height = window.innerHeight;
 let width = canvas.width;
 let height = canvas.height;
 
+// record
 let best = localStorage.getItem("bestScore") || 0;
 bestText.innerText = "Record: " + best;
 
@@ -99,15 +99,21 @@ document.querySelectorAll(".carOption").forEach(el=>{
     };
 });
 
-// gioco
+// variabili gioco
 let lanes = 3;
 let laneWidth = width / lanes;
 
 let carWidth = laneWidth * 0.5;
 let carHeight = carWidth * 1.8;
 
-let car, enemies, score, speed, baseSpeed, gameOver;
+let car, enemies, score, level, speed, gameOver;
 let turbo = false;
+
+// LEVEL SYSTEM
+function updateLevel(){
+    level = Math.floor(score / 10) + 1; // ogni 10 punti sali livello
+    speed = 4 + level * 1.2; // aumenta velocità
+}
 
 // start
 playBtn.onclick = ()=>{
@@ -119,23 +125,26 @@ playBtn.onclick = ()=>{
 function startGame(){
     car = {
         x: width/2 - carWidth/2,
-        y: height/2 - carHeight/2
+        y: height * 0.6
     };
 
     enemies = [];
     score = 0;
-    baseSpeed = 5;
+    level = 1;
+    speed = 4;
     gameOver = false;
 
     for(let i=0;i<3;i++) spawnRow();
 }
 
 // spawn
-let rowSpacing = carHeight * 2.5;
+let rowSpacing = carHeight * 2.8;
 let lastSpawnY = -rowSpacing;
 
 function spawnRow(){
     let lanesArr = [0,1,2];
+
+    // sempre una corsia libera
     let freeLane = lanesArr[Math.floor(Math.random()*3)];
     lanesArr.splice(lanesArr.indexOf(freeLane),1);
 
@@ -147,8 +156,7 @@ function spawnRow(){
             x: lane * laneWidth + (laneWidth - carWidth)/2,
             y: y,
             w: carWidth,
-            h: carHeight,
-            type: Math.random() // varietà traffico
+            h: carHeight
         });
     });
 }
@@ -158,11 +166,19 @@ let dragging = false;
 let lastX = 0;
 
 canvas.addEventListener("touchstart", e=>{
-    dragging = true;
-    lastX = e.touches[0].clientX;
+    if(e.touches.length === 1){
+        dragging = true;
+        lastX = e.touches[0].clientX;
+    }
+    if(e.touches.length === 2){
+        turbo = true;
+    }
 });
 
-canvas.addEventListener("touchend", ()=> dragging = false);
+canvas.addEventListener("touchend", ()=>{
+    dragging = false;
+    turbo = false;
+});
 
 canvas.addEventListener("touchmove", e=>{
     if(dragging && !gameOver){
@@ -173,12 +189,6 @@ canvas.addEventListener("touchmove", e=>{
     }
 });
 
-// turbo (tap con 2 dita)
-canvas.addEventListener("touchstart", e=>{
-    if(e.touches.length === 2) turbo = true;
-});
-canvas.addEventListener("touchend", ()=> turbo = false);
-
 // suono
 function beep(){
     let a = new AudioContext();
@@ -188,8 +198,11 @@ function beep(){
     o.stop(a.currentTime + 0.1);
 }
 
-// disegno auto player
+// disegna auto
 function drawCar(){
+    if(car.x < 20) car.x = 20;
+    if(car.x + carWidth > width - 20) car.x = width - 20 - carWidth;
+
     if(carType == "1"){
         ctx.fillStyle = "blue";
         ctx.fillRect(car.x, car.y, carWidth, carHeight);
@@ -198,15 +211,18 @@ function drawCar(){
         ctx.fillStyle = "green";
         ctx.fillRect(car.x, car.y, carWidth, carHeight);
         ctx.fillStyle = "black";
-        ctx.fillRect(car.x+10, car.y+10, carWidth-20, 20);
+        ctx.fillRect(car.x+10, car.y+10, carWidth-20, carHeight/3);
     }
     if(carType == "3"){
         ctx.fillStyle = "yellow";
-        ctx.beginPath();
-        ctx.arc(car.x+carWidth/2, car.y+carHeight/2, carWidth/2, 0, Math.PI*2);
-        ctx.fill();
+        ctx.fillRect(car.x, car.y, carWidth, carHeight);
+        ctx.fillStyle = "orange";
+        ctx.fillRect(car.x+8, car.y+8, carWidth-16, carHeight-16);
     }
 }
+
+// LEVEL UP TEXT
+let levelTextTimer = 0;
 
 // draw
 function draw(){
@@ -229,14 +245,21 @@ function draw(){
 
     if(!gameOver){
 
-        speed = baseSpeed + score * 0.1;
-        if(turbo) speed += 8;
+        let oldLevel = level;
+        updateLevel();
+
+        if(level > oldLevel){
+            levelTextTimer = 60; // mostra scritta
+        }
+
+        let currentSpeed = speed;
+        if(turbo) currentSpeed += 6;
 
         drawCar();
 
         ctx.fillStyle = "red";
         enemies.forEach(e=>{
-            e.y += speed + (e.type * 2);
+            e.y += currentSpeed;
             ctx.fillRect(e.x, e.y, e.w, e.h);
         });
 
@@ -270,13 +293,22 @@ function draw(){
                 btn.style.display = "block";
             }
         });
-
     }
 
+    // UI
     ctx.fillStyle = "white";
     ctx.font = "22px Arial";
     ctx.fillText("Punti: " + score, 15, 30);
     ctx.fillText("Record: " + best, 15, 60);
+    ctx.fillText("Livello: " + level, 15, 90);
+
+    // LEVEL UP
+    if(levelTextTimer > 0){
+        ctx.fillStyle = "lime";
+        ctx.font = "40px Arial";
+        ctx.fillText("LEVEL " + level, width/2 - 100, height/2);
+        levelTextTimer--;
+    }
 
     requestAnimationFrame(draw);
 }
@@ -287,4 +319,4 @@ btn.onclick = ()=> location.reload();
 </script>
 
 </body>
-    </html>
+</html>
