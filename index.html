@@ -2,320 +2,490 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Car Game LEVELS</title>
+<title>Missione Ciccio</title>
 <style>
-body { margin: 0; overflow: hidden; background: #222; font-family: Arial; }
+body { margin:0; overflow:hidden; background:#111; font-family:Arial; }
+canvas { display:none; }
 
-#menu {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    background: #111;
-    color: white;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
+#intro {
+ position:absolute;
+ width:100%;
+ height:100%;
+ background:#000;
+ color:white;
+ display:flex;
+ justify-content:center;
+ align-items:center;
 }
 
-.cars {
-    display: flex;
-    gap: 20px;
-    margin: 20px;
+#box {
+ background:#222;
+ padding:30px;
+ border:3px solid white;
+ text-align:center;
+ width:80%;
 }
 
-.carOption {
-    width: 50px;
-    height: 80px;
-    border: 3px solid white;
+#continueBtn {
+ margin-top:20px;
+ padding:15px 30px;
 }
 
-.selected { border: 3px solid lime; }
-
-button {
-    padding: 15px 30px;
-    font-size: 20px;
-    margin: 10px;
+#joystick {
+ position:absolute;
+ bottom:30px;
+ left:30px;
+ width:100px;
+ height:100px;
+ background:rgba(255,255,255,0.2);
+ border-radius:50%;
+ display:none;
 }
 
-canvas { display: none; }
+#stick {
+ position:absolute;
+ width:50px;
+ height:50px;
+ background:white;
+ border-radius:50%;
+ left:25px;
+ top:25px;
+}
 
-#restartBtn {
-    position: absolute;
-    top: 60%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: none;
+#shootBtn{
+ position:absolute;
+ bottom:30px;
+ right:30px;
+ width:80px;
+ height:80px;
+ border-radius:50%;
+ background:red;
+ color:white;
+ border:none;
+ display:none;
+}
+
+#restartBtn{
+ position:absolute;
+ top:50%;
+ left:50%;
+ transform:translate(-50%,-50%);
+ display:none;
 }
 </style>
 </head>
 <body>
 
-<div id="menu">
-    <h1>🚗 CAR GAME LEVELS</h1>
-    <p id="bestText">Record: 0</p>
-
-    <div class="cars">
-        <div class="carOption" data-type="1" style="background:blue;"></div>
-        <div class="carOption" data-type="2" style="background:green;"></div>
-        <div class="carOption" data-type="3" style="background:yellow;"></div>
-    </div>
-
-    <button id="playBtn">Gioca</button>
+<div id="intro">
+ <div id="box">
+  <h2>In nome della sburrevolezza</h2>
+  <p>Difendi Ciccio e raggiungi il castello.</p>
+  <button id="continueBtn">Continua</button>
+ </div>
 </div>
 
 <canvas id="game"></canvas>
+
+<div id="joystick"><div id="stick"></div></div>
+<button id="shootBtn">SPARA</button>
 <button id="restartBtn">Ricomincia</button>
 
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-const menu = document.getElementById("menu");
-const playBtn = document.getElementById("playBtn");
-const btn = document.getElementById("restartBtn");
-const bestText = document.getElementById("bestText");
+
+const intro = document.getElementById("intro");
+const continueBtn = document.getElementById("continueBtn");
+
+const joystick = document.getElementById("joystick");
+const stick = document.getElementById("stick");
+const shootBtn = document.getElementById("shootBtn");
+const restartBtn = document.getElementById("restartBtn");
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let width = canvas.width;
-let height = canvas.height;
+let gameStarted=false, gameOver=false, victory=false;
+let inCastle=false;
 
-// record
-let best = localStorage.getItem("bestScore") || 0;
-bestText.innerText = "Record: " + best;
+// player
+let player = {x:canvas.width/2, y:canvas.height*0.7, r:15};
 
-// scelta auto
-let carType = localStorage.getItem("carType") || "1";
+// vite
+let playerHits = 0;
+let maxHits = 3;
 
-document.querySelectorAll(".carOption").forEach(el=>{
-    if(el.dataset.type === carType) el.classList.add("selected");
+// livelli
+let level=1;
+let enemiesToSpawn=20;
+let enemiesKilled=0;
+let levelComplete=false;
 
-    el.onclick = ()=>{
-        document.querySelectorAll(".carOption").forEach(c=>c.classList.remove("selected"));
-        el.classList.add("selected");
-        carType = el.dataset.type;
-        localStorage.setItem("carType", carType);
-    };
-});
+// freccia
+let arrow = {x: canvas.width/2, y: 80};
 
-// variabili gioco
-let lanes = 3;
-let laneWidth = width / lanes;
+// nemici
+let enemies=[];
+let bullets=[];
 
-let carWidth = laneWidth * 0.5;
-let carHeight = carWidth * 1.8;
+// rocce
+let rocks=[];
 
-let car, enemies, score, level, speed, gameOver;
-let turbo = false;
+// boss + ciccio
+let boss=null;
+let bossBullets=[];
+let ciccio = {x:canvas.width/2, y:150};
 
-// LEVEL SYSTEM
-function updateLevel(){
-    level = Math.floor(score / 10) + 1; // ogni 10 punti sali livello
-    speed = 4 + level * 1.2; // aumenta velocità
+// spawn sicuro
+function getSafeSpawnY() {
+ let baseY = canvas.height * 0.7;
+
+ if (!rocks || rocks.length === 0) return baseY;
+
+ for (let offset = 0; offset < canvas.height; offset += 40) {
+  let y = baseY + offset;
+  let safe = true;
+
+  for (let r of rocks) {
+   let dx = player.x - r.x;
+   let dy = y - r.y;
+
+   if (Math.sqrt(dx*dx + dy*dy) < r.r + player.r + 5) {
+    safe = false;
+    break;
+   }
+  }
+
+  if (safe) return y;
+ }
+
+ return baseY;
 }
 
 // start
-playBtn.onclick = ()=>{
-    menu.style.display = "none";
-    canvas.style.display = "block";
-    startGame();
+continueBtn.onclick=()=>{
+ intro.style.display="none";
+ canvas.style.display="block";
+ joystick.style.display="block";
+ shootBtn.style.display="block";
+
+ generateRocks();
+ player.y = getSafeSpawnY();
+
+ gameStarted=true;
 };
 
-function startGame(){
-    car = {
-        x: width/2 - carWidth/2,
-        y: height * 0.6
-    };
+// joystick
+let joyX=0, joyY=0, active=false;
 
-    enemies = [];
-    score = 0;
-    level = 1;
-    speed = 4;
-    gameOver = false;
+joystick.addEventListener("touchstart", ()=> active=true);
 
-    for(let i=0;i<3;i++) spawnRow();
-}
-
-// spawn
-let rowSpacing = carHeight * 2.8;
-let lastSpawnY = -rowSpacing;
-
-function spawnRow(){
-    let lanesArr = [0,1,2];
-
-    // sempre una corsia libera
-    let freeLane = lanesArr[Math.floor(Math.random()*3)];
-    lanesArr.splice(lanesArr.indexOf(freeLane),1);
-
-    let y = lastSpawnY - rowSpacing;
-    lastSpawnY = y;
-
-    lanesArr.forEach(lane=>{
-        enemies.push({
-            x: lane * laneWidth + (laneWidth - carWidth)/2,
-            y: y,
-            w: carWidth,
-            h: carHeight
-        });
-    });
-}
-
-// touch
-let dragging = false;
-let lastX = 0;
-
-canvas.addEventListener("touchstart", e=>{
-    if(e.touches.length === 1){
-        dragging = true;
-        lastX = e.touches[0].clientX;
-    }
-    if(e.touches.length === 2){
-        turbo = true;
-    }
+joystick.addEventListener("touchmove", e=>{
+ if(!active) return;
+ let rect=joystick.getBoundingClientRect();
+ let x=e.touches[0].clientX-rect.left-50;
+ let y=e.touches[0].clientY-rect.top-50;
+ let dist=Math.sqrt(x*x+y*y);
+ let max=40;
+ if(dist>max){ x=x/dist*max; y=y/dist*max; }
+ stick.style.left=(x+25)+"px";
+ stick.style.top=(y+25)+"px";
+ joyX=x/max; joyY=y/max;
 });
 
-canvas.addEventListener("touchend", ()=>{
-    dragging = false;
-    turbo = false;
+joystick.addEventListener("touchend", ()=>{
+ active=false; joyX=0; joyY=0;
+ stick.style.left="25px"; stick.style.top="25px";
 });
 
-canvas.addEventListener("touchmove", e=>{
-    if(dragging && !gameOver){
-        let x = e.touches[0].clientX;
-        let dx = x - lastX;
-        car.x += dx;
-        lastX = x;
-    }
+// sparo
+shootBtn.addEventListener("touchstart", ()=>{
+ if(!gameOver && gameStarted){
+  bullets.push({x:player.x,y:player.y,vy:-10});
+ }
 });
 
-// suono
-function beep(){
-    let a = new AudioContext();
-    let o = a.createOscillator();
-    o.connect(a.destination);
-    o.start();
-    o.stop(a.currentTime + 0.1);
+// spawn nemici
+function spawnEnemy(){
+ if(enemies.length+enemiesKilled>=enemiesToSpawn) return;
+ enemies.push({
+  x:Math.random()*canvas.width,
+  y:-20,
+  r:15,
+  speed:1+level
+ });
 }
 
-// disegna auto
-function drawCar(){
-    if(car.x < 20) car.x = 20;
-    if(car.x + carWidth > width - 20) car.x = width - 20 - carWidth;
+setInterval(()=>{
+ if(gameStarted && !gameOver && !levelComplete && !inCastle) spawnEnemy();
+},800);
 
-    if(carType == "1"){
-        ctx.fillStyle = "blue";
-        ctx.fillRect(car.x, car.y, carWidth, carHeight);
-    }
-    if(carType == "2"){
-        ctx.fillStyle = "green";
-        ctx.fillRect(car.x, car.y, carWidth, carHeight);
-        ctx.fillStyle = "black";
-        ctx.fillRect(car.x+10, car.y+10, carWidth-20, carHeight/3);
-    }
-    if(carType == "3"){
-        ctx.fillStyle = "yellow";
-        ctx.fillRect(car.x, car.y, carWidth, carHeight);
-        ctx.fillStyle = "orange";
-        ctx.fillRect(car.x+8, car.y+8, carWidth-16, carHeight-16);
-    }
+// boss spara lento
+setInterval(()=>{
+ if(inCastle && boss && !gameOver){
+  bossBullets.push({
+   x: boss.x,
+   y: boss.y,
+   vx: (player.x - boss.x) / 100,
+   vy: (player.y - boss.y) / 100
+  });
+ }
+},1500);
+
+// rocce
+function generateRocks(){
+ rocks = [];
+ let centerX = canvas.width / 2;
+ let spacingY = 120;
+
+ for(let i=0;i<6+level;i++){
+  let y = 150 + i * spacingY;
+  let offset = (i % 2 === 0) ? -40 : 40;
+  let x = centerX + offset;
+  rocks.push({ x:x, y:y, r:25 });
+ }
 }
 
-// LEVEL UP TEXT
-let levelTextTimer = 0;
+// livello
+function nextLevel(){
+ level++;
+ enemiesKilled=0;
+ levelComplete=false;
+
+ if(level==2){
+  enemiesToSpawn=20; // ✅ modificato
+  generateRocks();
+  player.y = getSafeSpawnY();
+ }
+
+ if(level==3){
+  enemiesToSpawn=20; // ✅ modificato
+  generateRocks();
+  player.y = getSafeSpawnY();
+ }
+
+ if(level==4){
+  inCastle = true;
+  enemies=[];
+  bullets=[];
+  bossBullets=[];
+  rocks = [];
+
+  player.x = canvas.width / 2;
+  player.y = canvas.height * 0.85;
+
+  boss = {x:canvas.width/2,y:100,r:50,life:100};
+  ciccio = {x:canvas.width/2,y:200};
+ }
+}
 
 // draw
 function draw(){
 
-    ctx.fillStyle = "#333";
-    ctx.fillRect(0,0,width,height);
+ ctx.fillStyle="#111";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
 
-    ctx.fillStyle = "yellow";
-    ctx.fillRect(0,0,20,height);
-    ctx.fillRect(width-20,0,20,height);
+ if(!inCastle){
+  ctx.fillStyle="#444";
+  ctx.fillRect(canvas.width/2-60,0,120,canvas.height);
 
-    let dash = 120, gap = 60;
+  ctx.fillStyle="#777";
+  rocks.forEach(r=>{
+   ctx.beginPath();
+   ctx.arc(r.x,r.y,r.r,0,Math.PI*2);
+   ctx.fill();
+  });
 
-    for(let i=1;i<lanes;i++){
-        let x = i * laneWidth;
-        for(let y=0;y<height;y+=dash+gap){
-            ctx.fillRect(x-10,y,20,dash);
-        }
+  if(levelComplete){
+   ctx.fillStyle="yellow";
+   ctx.beginPath();
+   ctx.moveTo(arrow.x,arrow.y);
+   ctx.lineTo(arrow.x-20,arrow.y+40);
+   ctx.lineTo(arrow.x+20,arrow.y+40);
+   ctx.fill();
+  }
+ }
+
+ if(gameStarted && !gameOver){
+
+  let newX=player.x+joyX*3.5;
+  let newY=player.y+joyY*3.5;
+
+  let blocked=rocks.some(r=>{
+   let dx=newX-r.x;
+   let dy=newY-r.y;
+   return Math.sqrt(dx*dx+dy*dy)<r.r+player.r;
+  });
+
+  if(!blocked){
+   player.x=newX;
+   player.y=newY;
+  }
+
+  ctx.fillStyle="cyan";
+  ctx.beginPath();
+  ctx.arc(player.x,player.y,player.r,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle="yellow";
+  bullets.forEach(b=>{
+   b.y+=b.vy;
+   ctx.fillRect(b.x-3,b.y,6,10);
+  });
+
+  if(!inCastle){
+
+   ctx.fillStyle="red";
+   enemies.forEach(e=>{
+    let dx=player.x-e.x;
+    let dy=player.y-e.y;
+    let d=Math.sqrt(dx*dx+dy*dy);
+
+    e.x += dx/d * e.speed;
+    e.y += dy/d * e.speed;
+
+    ctx.beginPath();
+    ctx.arc(e.x,e.y,e.r,0,Math.PI*2);
+    ctx.fill();
+
+    let dxp = player.x - e.x;
+    let dyp = player.y - e.y;
+
+    if(Math.sqrt(dxp*dxp + dyp*dyp) < player.r + e.r){
+     enemies.splice(enemies.indexOf(e),1);
+     playerHits++;
+
+     if(playerHits >= maxHits){
+      gameOver = true;
+      restartBtn.style.display="block";
+     }
+    }
+   });
+
+   bullets=bullets.filter(b=>{
+    for(let i=0;i<enemies.length;i++){
+     let e=enemies[i];
+     let dx=b.x-e.x;
+     let dy=b.y-e.y;
+     if(Math.sqrt(dx*dx+dy*dy)<e.r){
+      enemies.splice(i,1);
+      enemiesKilled++;
+      return false;
+     }
+    }
+    return b.y>0;
+   });
+
+   if(enemiesKilled>=enemiesToSpawn){
+    levelComplete=true;
+   }
+
+   if(levelComplete){
+    let dx=player.x-arrow.x;
+    let dy=player.y-arrow.y;
+
+    if(Math.sqrt(dx*dx+dy*dy)<30){
+     enemies=[]; bullets=[];
+     nextLevel();
+    }
+   }
+
+  } else {
+
+   // 📝 TESTO (PIÙ IN BASSO)
+   ctx.fillStyle = "white";
+   ctx.font = "20px Arial";
+   ctx.fillText("Ciccio è intrappolato!", canvas.width/2 - 120, 80);
+
+   // CICCCIO
+   ctx.fillStyle="orange";
+   ctx.beginPath();
+   ctx.arc(ciccio.x,ciccio.y,20,0,Math.PI*2);
+   ctx.fill();
+
+   ctx.fillStyle="brown";
+   ctx.fillRect(ciccio.x-15,ciccio.y+10,30,20);
+
+   // BOSS
+   ctx.fillStyle="purple";
+   ctx.beginPath();
+   ctx.arc(boss.x,boss.y,boss.r,0,Math.PI*2);
+   ctx.fill();
+
+   let dx=player.x-boss.x;
+   let dy=player.y-boss.y;
+   let d=Math.sqrt(dx*dx+dy*dy);
+
+   boss.x+=dx/d*0.5;
+   boss.y+=dy/d*0.5;
+
+   ctx.fillStyle="red";
+   bossBullets.forEach(b=>{
+    b.x+=b.vx;
+    b.y+=b.vy;
+
+    ctx.beginPath();
+    ctx.arc(b.x,b.y,8,0,Math.PI*2);
+    ctx.fill();
+   });
+
+   bossBullets = bossBullets.filter(b=>{
+    let dx = player.x - b.x;
+    let dy = player.y - b.y;
+
+    if(Math.sqrt(dx*dx+dy*dy) < player.r){
+     playerHits++;
+
+     if(playerHits >= maxHits){
+      gameOver = true;
+      restartBtn.style.display="block";
+     }
+
+     return false;
     }
 
-    if(!gameOver){
+    return true;
+   });
 
-        let oldLevel = level;
-        updateLevel();
+   bullets = bullets.filter(b=>{
+    let dx=b.x-boss.x;
+    let dy=b.y-boss.y;
 
-        if(level > oldLevel){
-            levelTextTimer = 60; // mostra scritta
-        }
-
-        let currentSpeed = speed;
-        if(turbo) currentSpeed += 6;
-
-        drawCar();
-
-        ctx.fillStyle = "red";
-        enemies.forEach(e=>{
-            e.y += currentSpeed;
-            ctx.fillRect(e.x, e.y, e.w, e.h);
-        });
-
-        enemies = enemies.filter(e=>{
-            if(e.y > height){
-                score++;
-                return false;
-            }
-            return true;
-        });
-
-        if(enemies.length === 0 || Math.min(...enemies.map(e=>e.y)) > rowSpacing){
-            spawnRow();
-        }
-
-        enemies.forEach(e=>{
-            if(
-                car.x < e.x + e.w &&
-                car.x + carWidth > e.x &&
-                car.y < e.y + e.h &&
-                car.y + carHeight > e.y
-            ){
-                gameOver = true;
-                beep();
-
-                if(score > best){
-                    best = score;
-                    localStorage.setItem("bestScore", best);
-                }
-
-                btn.style.display = "block";
-            }
-        });
+    if(Math.sqrt(dx*dx+dy*dy)<boss.r){
+     boss.life -= 2;
+     return false;
     }
 
-    // UI
-    ctx.fillStyle = "white";
-    ctx.font = "22px Arial";
-    ctx.fillText("Punti: " + score, 15, 30);
-    ctx.fillText("Record: " + best, 15, 60);
-    ctx.fillText("Livello: " + level, 15, 90);
+    return b.y>0;
+   });
 
-    // LEVEL UP
-    if(levelTextTimer > 0){
-        ctx.fillStyle = "lime";
-        ctx.font = "40px Arial";
-        ctx.fillText("LEVEL " + level, width/2 - 100, height/2);
-        levelTextTimer--;
-    }
+   if(boss.life<=0){
+    victory=true;
+    gameOver=true;
+    restartBtn.style.display="block";
+   }
 
-    requestAnimationFrame(draw);
+   ctx.fillStyle="purple";
+   ctx.fillRect(20,80,boss.life*2,10);
+  }
+ }
+
+ ctx.fillStyle="white";
+ ctx.fillText("Livello: "+level,10,30);
+ ctx.fillText("Vite: " + (maxHits - playerHits),10,50);
+
+ if(victory){
+  ctx.fillStyle="lime";
+  ctx.font="40px Arial";
+  ctx.fillText("HAI SALVATO CICCIO!",canvas.width/2-180,canvas.height/2);
+ }
+
+ requestAnimationFrame(draw);
 }
 
 draw();
 
-btn.onclick = ()=> location.reload();
+restartBtn.onclick=()=>location.reload();
 </script>
 
 </body>
