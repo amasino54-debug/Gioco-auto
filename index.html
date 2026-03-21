@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Car Game</title>
+<style>
+body { margin: 0; overflow: hidden; background: #222; }
+canvas { display: block; }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let width = canvas.width;
+let height = canvas.height;
+
+// corsie
+let lanes = 3;
+let laneWidth = width / lanes;
+
+// auto
+let carWidth = laneWidth * 0.4;
+let carHeight = carWidth * 1.6;
+
+let car = {
+    x: width/2 - carWidth/2,
+    y: height/2 - carHeight/2,
+    w: carWidth,
+    h: carHeight
+};
+
+// nemici
+let enemies = [];
+
+let speed = 6;
+let score = 0;
+
+// distanza sicura
+let rowSpacing = carHeight * 2.2;
+let lastSpawnY = -rowSpacing;
+
+// spawn intelligente
+function spawnRow() {
+    let lanesArr = [0,1,2];
+    let freeLane = lanesArr[Math.floor(Math.random()*3)];
+    lanesArr.splice(lanesArr.indexOf(freeLane),1);
+
+    let y = lastSpawnY - rowSpacing;
+    lastSpawnY = y;
+
+    lanesArr.forEach(lane => {
+        enemies.push({
+            x: lane * laneWidth + (laneWidth - carWidth)/2,
+            y: y,
+            w: carWidth,
+            h: carHeight
+        });
+        });
+    });
+}
+
+// iniziale
+for(let i=0;i<3;i++) spawnRow();
+
+// touch controllo
+let dragging = false;
+let lastX = 0;
+
+canvas.addEventListener("touchstart", e=>{
+    dragging = true;
+    lastX = e.touches[0].clientX;
+});
+
+canvas.addEventListener("touchend", ()=> dragging = false);
+
+canvas.addEventListener("touchmove", e=>{
+    if(dragging){
+        let x = e.touches[0].clientX;
+        let dx = x - lastX;
+        car.x += dx;
+        lastX = x;
+    }
+});
+
+// disegno
+function draw(){
+    ctx.fillStyle = "#333";
+    ctx.fillRect(0,0,width,height);
+
+    // bordi
+    ctx.fillStyle = "yellow";
+    ctx.fillRect(0,0,20,height);
+    ctx.fillRect(width-20,0,20,height);
+
+    // linee tratteggiate
+    let dash = 100;
+    let gap = 50;
+
+    for(let i=1;i<3;i++){
+        let x = i * laneWidth;
+
+        for(let y=0;y<height;y+=dash+gap){
+            ctx.fillRect(x-10,y,20,dash);
+        }
+    }
+
+    // player
+    ctx.fillStyle = "blue";
+    ctx.fillRect(car.x, car.y, car.w, car.h);
+
+    // nemici
+    ctx.fillStyle = "red";
+    enemies.forEach(e=>{
+        e.y += speed;
+        ctx.fillRect(e.x, e.y, e.w, e.h);
+    });
+
+    // rimuovi
+    enemies = enemies.filter(e=>{
+        if(e.y > height){
+            score++;
+            return false;
+        }
+        return true;
+    });
+
+    // spawn sicuro
+    let highest = Math.min(...enemies.map(e=>e.y));
+    if(highest > rowSpacing) spawnRow();
+
+    // collisione
+    enemies.forEach(e=>{
+        if(
+            car.x < e.x + e.w &&
+            car.x + car.w > e.x &&
+            car.y < e.y + e.h &&
+            car.y + car.h > e.y
+        ){
+            alert("GAME OVER\nPunti: " + score);
+            document.location.reload();
+        }
+    });
+
+    // punteggio
+    ctx.fillStyle = "white";
+    ctx.font = "20px Arial";
+    ctx.fillText("Punti: " + score, 10, 30);
+
+    requestAnimationFrame(draw);
+}
+
+draw();
+</script>
+
+</body>
+</html>content://com.android.externalstorage.documents/tree/primary%3AGioco%20auto%20::primary:Gioco auto /index.html
