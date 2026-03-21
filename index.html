@@ -5,7 +5,12 @@
 <title>Missione Ciccio</title>
 <style>
 body { margin:0; overflow:hidden; background:#111; font-family:Arial; }
-canvas { display:none; }
+
+canvas {
+ display:block;
+ width:100vw;
+ height:100vh;
+}
 
 #intro {
  position:absolute;
@@ -20,49 +25,48 @@ canvas { display:none; }
 
 #box {
  background:#222;
- padding:30px;
+ padding:40px;
  border:3px solid white;
  text-align:center;
  width:80%;
+ font-size:20px;
 }
 
-#continueBtn {
- margin-top:20px;
- padding:15px 30px;
+button{
+ font-size:18px;
 }
 
 #joystick {
  position:absolute;
- bottom:30px;
- left:30px;
- width:100px;
- height:100px;
+ bottom:40px;
+ left:40px;
+ width:140px;
+ height:140px;
  background:rgba(255,255,255,0.2);
  border-radius:50%;
- display:none;
 }
 
 #stick {
  position:absolute;
- width:50px;
- height:50px;
+ width:70px;
+ height:70px;
  background:white;
  border-radius:50%;
- left:25px;
- top:25px;
+ left:35px;
+ top:35px;
 }
 
 #shootBtn{
  position:absolute;
- bottom:30px;
- right:30px;
- width:80px;
- height:80px;
+ bottom:40px;
+ right:40px;
+ width:120px;
+ height:120px;
  border-radius:50%;
  background:red;
  color:white;
  border:none;
- display:none;
+ font-size:20px;
 }
 
 #restartBtn{
@@ -71,6 +75,7 @@ canvas { display:none; }
  left:50%;
  transform:translate(-50%,-50%);
  display:none;
+ font-size:20px;
 }
 </style>
 </head>
@@ -78,9 +83,9 @@ canvas { display:none; }
 
 <div id="intro">
  <div id="box">
-  <h2>In nome della sburrevolezza</h2>
+  <h2>Missione Ciccio</h2>
   <p>Difendi Ciccio e raggiungi il castello.</p>
-  <button id="continueBtn">Continua</button>
+  <button onclick="startGame()">Continua</button>
  </div>
 </div>
 
@@ -94,131 +99,36 @@ canvas { display:none; }
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-const intro = document.getElementById("intro");
-const continueBtn = document.getElementById("continueBtn");
+// 🔥 scala dinamica
+function resize(){
+ canvas.width = window.innerWidth;
+ canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
 
-const joystick = document.getElementById("joystick");
-const stick = document.getElementById("stick");
-const shootBtn = document.getElementById("shootBtn");
-const restartBtn = document.getElementById("restartBtn");
+// player (più grande)
+let player = {x:300, y:500, r:25};
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+let boss = null;
+let bossBullets = [];
+let bullets = [];
 
-let gameStarted=false, gameOver=false, victory=false;
-let inCastle=false;
+let inCastle = false;
+let gameOver = false;
+let victory = false;
 
-// player
-let player = {x:canvas.width/2, y:canvas.height*0.7, r:15};
-
-// vite
 let playerHits = 0;
 let maxHits = 3;
 
-// livelli
-let level=1;
-let enemiesToSpawn=20;
-let enemiesKilled=0;
-let levelComplete=false;
-
-// freccia
-let arrow = {x: canvas.width/2, y: 80};
-
-// nemici
-let enemies=[];
-let bullets=[];
-
-// rocce
-let rocks=[];
-
-// boss + ciccio
-let boss=null;
-let bossBullets=[];
-let ciccio = {x:canvas.width/2, y:150};
-
-// spawn sicuro
-function getSafeSpawnY() {
- let baseY = canvas.height * 0.7;
-
- if (!rocks || rocks.length === 0) return baseY;
-
- for (let offset = 0; offset < canvas.height; offset += 40) {
-  let y = baseY + offset;
-  let safe = true;
-
-  for (let r of rocks) {
-   let dx = player.x - r.x;
-   let dy = y - r.y;
-
-   if (Math.sqrt(dx*dx + dy*dy) < r.r + player.r + 5) {
-    safe = false;
-    break;
-   }
-  }
-
-  if (safe) return y;
- }
-
- return baseY;
+function startGame(){
+ document.getElementById("intro").style.display="none";
 }
 
-// start
-continueBtn.onclick=()=>{
- intro.style.display="none";
- canvas.style.display="block";
- joystick.style.display="block";
- shootBtn.style.display="block";
-
- generateRocks();
- player.y = getSafeSpawnY();
-
- gameStarted=true;
+// sparo player
+document.getElementById("shootBtn").onclick=()=>{
+ bullets.push({x:player.x,y:player.y,vy:-12});
 };
-
-// joystick
-let joyX=0, joyY=0, active=false;
-
-joystick.addEventListener("touchstart", ()=> active=true);
-
-joystick.addEventListener("touchmove", e=>{
- if(!active) return;
- let rect=joystick.getBoundingClientRect();
- let x=e.touches[0].clientX-rect.left-50;
- let y=e.touches[0].clientY-rect.top-50;
- let dist=Math.sqrt(x*x+y*y);
- let max=40;
- if(dist>max){ x=x/dist*max; y=y/dist*max; }
- stick.style.left=(x+25)+"px";
- stick.style.top=(y+25)+"px";
- joyX=x/max; joyY=y/max;
-});
-
-joystick.addEventListener("touchend", ()=>{
- active=false; joyX=0; joyY=0;
- stick.style.left="25px"; stick.style.top="25px";
-});
-
-// sparo
-shootBtn.addEventListener("touchstart", ()=>{
- if(!gameOver && gameStarted){
-  bullets.push({x:player.x,y:player.y,vy:-10});
- }
-});
-
-// spawn nemici
-function spawnEnemy(){
- if(enemies.length+enemiesKilled>=enemiesToSpawn) return;
- enemies.push({
-  x:Math.random()*canvas.width,
-  y:-20,
-  r:15,
-  speed:1+level
- });
-}
-
-setInterval(()=>{
- if(gameStarted && !gameOver && !levelComplete && !inCastle) spawnEnemy();
-},800);
 
 // boss spara lento
 setInterval(()=>{
@@ -226,266 +136,130 @@ setInterval(()=>{
   bossBullets.push({
    x: boss.x,
    y: boss.y,
-   vx: (player.x - boss.x) / 100,
-   vy: (player.y - boss.y) / 100
+   vx: (player.x - boss.x)/120,
+   vy: (player.y - boss.y)/120
   });
  }
 },1500);
 
-// rocce
-function generateRocks(){
- rocks = [];
- let centerX = canvas.width / 2;
- let spacingY = 120;
+// entra nel boss (test rapido)
+setTimeout(()=>{
+ inCastle = true;
 
- for(let i=0;i<6+level;i++){
-  let y = 150 + i * spacingY;
-  let offset = (i % 2 === 0) ? -40 : 40;
-  let x = centerX + offset;
-  rocks.push({ x:x, y:y, r:25 });
- }
-}
+ player.x = canvas.width/2;
+ player.y = canvas.height*0.85;
 
-// livello
-function nextLevel(){
- level++;
- enemiesKilled=0;
- levelComplete=false;
+ boss = {x:canvas.width/2,y:100,r:80,life:150};
 
- if(level==2){
-  enemiesToSpawn=20; // ✅ modificato
-  generateRocks();
-  player.y = getSafeSpawnY();
- }
+},2000);
 
- if(level==3){
-  enemiesToSpawn=20; // ✅ modificato
-  generateRocks();
-  player.y = getSafeSpawnY();
- }
+// movimento mouse (per test desktop GitHub)
+window.addEventListener("mousemove", e=>{
+ player.x = e.clientX;
+});
 
- if(level==4){
-  inCastle = true;
-  enemies=[];
-  bullets=[];
-  bossBullets=[];
-  rocks = [];
-
-  player.x = canvas.width / 2;
-  player.y = canvas.height * 0.85;
-
-  boss = {x:canvas.width/2,y:100,r:50,life:100};
-  ciccio = {x:canvas.width/2,y:200};
- }
-}
-
-// draw
 function draw(){
 
  ctx.fillStyle="#111";
  ctx.fillRect(0,0,canvas.width,canvas.height);
 
- if(!inCastle){
-  ctx.fillStyle="#444";
-  ctx.fillRect(canvas.width/2-60,0,120,canvas.height);
+ if(inCastle){
 
-  ctx.fillStyle="#777";
-  rocks.forEach(r=>{
-   ctx.beginPath();
-   ctx.arc(r.x,r.y,r.r,0,Math.PI*2);
-   ctx.fill();
-  });
+  // testo
+  ctx.fillStyle="white";
+  ctx.font="30px Arial";
+  ctx.fillText("Ciccio è intrappolato!", canvas.width/2-180, 100);
 
-  if(levelComplete){
-   ctx.fillStyle="yellow";
-   ctx.beginPath();
-   ctx.moveTo(arrow.x,arrow.y);
-   ctx.lineTo(arrow.x-20,arrow.y+40);
-   ctx.lineTo(arrow.x+20,arrow.y+40);
-   ctx.fill();
-  }
- }
-
- if(gameStarted && !gameOver){
-
-  let newX=player.x+joyX*3.5;
-  let newY=player.y+joyY*3.5;
-
-  let blocked=rocks.some(r=>{
-   let dx=newX-r.x;
-   let dy=newY-r.y;
-   return Math.sqrt(dx*dx+dy*dy)<r.r+player.r;
-  });
-
-  if(!blocked){
-   player.x=newX;
-   player.y=newY;
-  }
-
+  // player
   ctx.fillStyle="cyan";
   ctx.beginPath();
   ctx.arc(player.x,player.y,player.r,0,Math.PI*2);
   ctx.fill();
 
+  // boss
+  ctx.fillStyle="purple";
+  ctx.beginPath();
+  ctx.arc(boss.x,boss.y,boss.r,0,Math.PI*2);
+  ctx.fill();
+
+  // movimento boss
+  let dx=player.x-boss.x;
+  let dy=player.y-boss.y;
+  let d=Math.sqrt(dx*dx+dy*dy);
+
+  boss.x+=dx/d*0.4;
+  boss.y+=dy/d*0.4;
+
+  // proiettili boss
+  ctx.fillStyle="red";
+  bossBullets.forEach(b=>{
+   b.x+=b.vx;
+   b.y+=b.vy;
+
+   ctx.beginPath();
+   ctx.arc(b.x,b.y,10,0,Math.PI*2);
+   ctx.fill();
+  });
+
+  // collisione
+  bossBullets = bossBullets.filter(b=>{
+   let dx=player.x-b.x;
+   let dy=player.y-b.y;
+
+   if(Math.sqrt(dx*dx+dy*dy)<player.r){
+    playerHits++;
+    return false;
+   }
+   return true;
+  });
+
+  // colpi player
   ctx.fillStyle="yellow";
   bullets.forEach(b=>{
    b.y+=b.vy;
-   ctx.fillRect(b.x-3,b.y,6,10);
+   ctx.fillRect(b.x-5,b.y,10,15);
   });
 
-  if(!inCastle){
+  bullets = bullets.filter(b=>{
+   let dx=b.x-boss.x;
+   let dy=b.y-boss.y;
 
-   ctx.fillStyle="red";
-   enemies.forEach(e=>{
-    let dx=player.x-e.x;
-    let dy=player.y-e.y;
-    let d=Math.sqrt(dx*dx+dy*dy);
-
-    e.x += dx/d * e.speed;
-    e.y += dy/d * e.speed;
-
-    ctx.beginPath();
-    ctx.arc(e.x,e.y,e.r,0,Math.PI*2);
-    ctx.fill();
-
-    let dxp = player.x - e.x;
-    let dyp = player.y - e.y;
-
-    if(Math.sqrt(dxp*dxp + dyp*dyp) < player.r + e.r){
-     enemies.splice(enemies.indexOf(e),1);
-     playerHits++;
-
-     if(playerHits >= maxHits){
-      gameOver = true;
-      restartBtn.style.display="block";
-     }
-    }
-   });
-
-   bullets=bullets.filter(b=>{
-    for(let i=0;i<enemies.length;i++){
-     let e=enemies[i];
-     let dx=b.x-e.x;
-     let dy=b.y-e.y;
-     if(Math.sqrt(dx*dx+dy*dy)<e.r){
-      enemies.splice(i,1);
-      enemiesKilled++;
-      return false;
-     }
-    }
-    return b.y>0;
-   });
-
-   if(enemiesKilled>=enemiesToSpawn){
-    levelComplete=true;
+   if(Math.sqrt(dx*dx+dy*dy)<boss.r){
+    boss.life -= 3;
+    return false;
    }
+   return b.y>0;
+  });
 
-   if(levelComplete){
-    let dx=player.x-arrow.x;
-    let dy=player.y-arrow.y;
+  // vita boss
+  ctx.fillStyle="purple";
+  ctx.fillRect(20,40,boss.life*2,15);
 
-    if(Math.sqrt(dx*dx+dy*dy)<30){
-     enemies=[]; bullets=[];
-     nextLevel();
-    }
-   }
+  if(boss.life<=0){
+   victory=true;
+  }
 
-  } else {
-
-   // 📝 TESTO (PIÙ IN BASSO)
-   ctx.fillStyle = "white";
-   ctx.font = "20px Arial";
-   ctx.fillText("Ciccio è intrappolato!", canvas.width/2 - 120, 80);
-
-   // CICCCIO
-   ctx.fillStyle="orange";
-   ctx.beginPath();
-   ctx.arc(ciccio.x,ciccio.y,20,0,Math.PI*2);
-   ctx.fill();
-
-   ctx.fillStyle="brown";
-   ctx.fillRect(ciccio.x-15,ciccio.y+10,30,20);
-
-   // BOSS
-   ctx.fillStyle="purple";
-   ctx.beginPath();
-   ctx.arc(boss.x,boss.y,boss.r,0,Math.PI*2);
-   ctx.fill();
-
-   let dx=player.x-boss.x;
-   let dy=player.y-boss.y;
-   let d=Math.sqrt(dx*dx+dy*dy);
-
-   boss.x+=dx/d*0.5;
-   boss.y+=dy/d*0.5;
-
-   ctx.fillStyle="red";
-   bossBullets.forEach(b=>{
-    b.x+=b.vx;
-    b.y+=b.vy;
-
-    ctx.beginPath();
-    ctx.arc(b.x,b.y,8,0,Math.PI*2);
-    ctx.fill();
-   });
-
-   bossBullets = bossBullets.filter(b=>{
-    let dx = player.x - b.x;
-    let dy = player.y - b.y;
-
-    if(Math.sqrt(dx*dx+dy*dy) < player.r){
-     playerHits++;
-
-     if(playerHits >= maxHits){
-      gameOver = true;
-      restartBtn.style.display="block";
-     }
-
-     return false;
-    }
-
-    return true;
-   });
-
-   bullets = bullets.filter(b=>{
-    let dx=b.x-boss.x;
-    let dy=b.y-boss.y;
-
-    if(Math.sqrt(dx*dx+dy*dy)<boss.r){
-     boss.life -= 2;
-     return false;
-    }
-
-    return b.y>0;
-   });
-
-   if(boss.life<=0){
-    victory=true;
-    gameOver=true;
-    restartBtn.style.display="block";
-   }
-
-   ctx.fillStyle="purple";
-   ctx.fillRect(20,80,boss.life*2,10);
+  if(playerHits>=maxHits){
+   gameOver=true;
   }
  }
 
- ctx.fillStyle="white";
- ctx.fillText("Livello: "+level,10,30);
- ctx.fillText("Vite: " + (maxHits - playerHits),10,50);
-
  if(victory){
   ctx.fillStyle="lime";
-  ctx.font="40px Arial";
-  ctx.fillText("HAI SALVATO CICCIO!",canvas.width/2-180,canvas.height/2);
+  ctx.font="50px Arial";
+  ctx.fillText("HAI SALVATO CICCIO!", canvas.width/2-250, canvas.height/2);
+ }
+
+ if(gameOver){
+  ctx.fillStyle="red";
+  ctx.font="50px Arial";
+  ctx.fillText("GAME OVER", canvas.width/2-150, canvas.height/2);
  }
 
  requestAnimationFrame(draw);
 }
 
 draw();
-
-restartBtn.onclick=()=>location.reload();
 </script>
 
 </body>
