@@ -181,3 +181,35 @@ function draw(){
                 explosion = {x: car.x, y: car.y, r: 10};
                 btn.style.display = "block";
             }
+        });
+
+    } else {
+        // animazione esplosione
+        if(explosion){
+            ctx.fillStyle = "orange";
+            ctx.beginPath();
+            ctx.arc(explosion.x + car.w/2, explosion.y + car.h/2, explosion.r, 0, Math.PI*2);
+            ctx.fill();
+            explosion.r += 5;
+        }
+    }
+
+    // punteggi
+    ctx.fillStyle = "white";
+    ctx.font = "22px Arial";
+    ctx.fillText("Punti: " + score, 15, 30);
+    ctx.fillText("Record: " + best, 15, 60);
+
+    requestAnimationFrame(draw);
+}
+
+draw();
+
+// restart
+btn.onclick = () => {
+    location.reload();
+};
+</script>
+
+</body>
+</html>
