@@ -2,19 +2,30 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Car Game</title>
+<title>Car Game PRO</title>
 <style>
 body { margin: 0; overflow: hidden; background: #222; }
 canvas { display: block; }
+#restartBtn {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 15px 30px;
+    font-size: 20px;
+    display: none;
+}
 </style>
 </head>
 <body>
 
 <canvas id="game"></canvas>
+<button id="restartBtn">Ricomincia</button>
 
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+const btn = document.getElementById("restartBtn");
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
@@ -37,23 +48,23 @@ let car = {
     h: carHeight
 };
 
-// nemici
 let enemies = [];
 
 let baseSpeed = 5;
 let speed = baseSpeed;
 let score = 0;
+let gameOver = false;
 
-// distanza sicura
+// record
+let best = localStorage.getItem("bestScore") || 0;
+
+// spawn
 let rowSpacing = carHeight * 2.5;
 let lastSpawnY = -rowSpacing;
 
-// spawn intelligente
 function spawnRow() {
     let lanesArr = [0,1,2];
-
-    // lascia sempre una corsia libera
-    let freeLane = lanesArr[Math.floor(Math.random()*lanes)];
+    let freeLane = lanesArr[Math.floor(Math.random()*3)];
     lanesArr.splice(lanesArr.indexOf(freeLane),1);
 
     let y = lastSpawnY - rowSpacing;
@@ -69,10 +80,9 @@ function spawnRow() {
     });
 }
 
-// iniziale
 for(let i=0;i<3;i++) spawnRow();
 
-// touch controllo
+// touch
 let dragging = false;
 let lastX = 0;
 
@@ -84,7 +94,7 @@ canvas.addEventListener("touchstart", e=>{
 canvas.addEventListener("touchend", ()=> dragging = false);
 
 canvas.addEventListener("touchmove", e=>{
-    if(dragging){
+    if(dragging && !gameOver){
         let x = e.touches[0].clientX;
         let dx = x - lastX;
         car.x += dx;
@@ -92,80 +102,82 @@ canvas.addEventListener("touchmove", e=>{
     }
 });
 
-// disegno
-function draw(){
+// suono (beep semplice)
+function beep(){
+    let ctxAudio = new (window.AudioContext || window.webkitAudioContext)();
+    let osc = ctxAudio.createOscillator();
+    osc.connect(ctxAudio.destination);
+    osc.start();
+    osc.stop(ctxAudio.currentTime + 0.1);
+}
 
-    // aumenta velocità col punteggio
-    speed = baseSpeed + score * 0.1;
+// esplosione
+let explosion = null;
+
+function draw(){
 
     ctx.fillStyle = "#333";
     ctx.fillRect(0,0,width,height);
 
-    // bordi strada
+    // strada
     ctx.fillStyle = "yellow";
     ctx.fillRect(0,0,20,height);
     ctx.fillRect(width-20,0,20,height);
 
-    // linee tratteggiate corsie
-    let dash = 120;
-    let gap = 60;
+    let dash = 120, gap = 60;
 
     for(let i=1;i<lanes;i++){
         let x = i * laneWidth;
-
         for(let y=0;y<height;y+=dash+gap){
             ctx.fillRect(x-10,y,20,dash);
         }
     }
 
-    // player
-    ctx.fillStyle = "blue";
-    ctx.fillRect(car.x, car.y, car.w, car.h);
+    if(!gameOver){
 
-    // nemici
-    ctx.fillStyle = "red";
-    enemies.forEach(e=>{
-        e.y += speed;
-        ctx.fillRect(e.x, e.y, e.w, e.h);
-    });
+        speed = baseSpeed + score * 0.1;
 
-    // rimuovi e punteggio
-    enemies = enemies.filter(e=>{
-        if(e.y > height){
-            score++;
-            return false;
+        // player (più bello)
+        ctx.fillStyle = "blue";
+        ctx.fillRect(car.x, car.y, car.w, car.h);
+        ctx.fillStyle = "lightblue";
+        ctx.fillRect(car.x+10, car.y+10, car.w-20, car.h-20);
+
+        // nemici
+        ctx.fillStyle = "red";
+        enemies.forEach(e=>{
+            e.y += speed;
+            ctx.fillRect(e.x, e.y, e.w, e.h);
+        });
+
+        enemies = enemies.filter(e=>{
+            if(e.y > height){
+                score++;
+                return false;
+            }
+            return true;
+        });
+
+        if(enemies.length === 0 || Math.min(...enemies.map(e=>e.y)) > rowSpacing){
+            spawnRow();
         }
-        return true;
-    });
 
-    // spawn sicuro
-    if(enemies.length === 0 || Math.min(...enemies.map(e=>e.y)) > rowSpacing){
-        spawnRow();
-    }
+        // collisione
+        enemies.forEach(e=>{
+            if(
+                car.x < e.x + e.w &&
+                car.x + car.w > e.x &&
+                car.y < e.y + e.h &&
+                car.y + car.h > e.y
+            ){
+                gameOver = true;
+                beep();
 
-    // collisione
-    enemies.forEach(e=>{
-        if(
-            car.x < e.x + e.w &&
-            car.x + car.w > e.x &&
-            car.y < e.y + e.h &&
-            car.y + car.h > e.y
-        ){
-            alert("GAME OVER\nPunti: " + score);
-            document.location.reload();
-        }
-    });
+                if(score > best){
+                    best = score;
+                    localStorage.setItem("bestScore", best);
+                }
 
-    // punteggio
-    ctx.fillStyle = "white";
-    ctx.font = "22px Arial";
-    ctx.fillText("Punti: " + score, 15, 35);
-
-    requestAnimationFrame(draw);
-}
-
-draw();
-</script>
-
-</body>
-</html>
+                explosion = {x: car.x, y: car.y, r: 10};
+                btn.style.display = "block";
+            }
