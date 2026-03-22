@@ -2,20 +2,9 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Missione Ciccio</title>
-
 <style>
-html, body {
- margin:0;
- padding:0;
- width:100%;
- height:100%;
- overflow:hidden;
- background:#111;
- font-family:Arial;
-}
-
+body { margin:0; overflow:hidden; background:#111; font-family:Arial; }
 canvas { display:none; }
 
 #intro {
@@ -105,7 +94,7 @@ canvas { display:none; }
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-// 🔥 RESPONSIVE (AGGIUNTO)
+// 🔥 SOLO QUESTO CAMBIATO
 function resizeCanvas(){
  canvas.width = window.innerWidth;
  canvas.height = window.innerHeight;
@@ -113,16 +102,8 @@ function resizeCanvas(){
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
-// 🔥 SCALA MIGLIORATA (SENZA CAMBIARE IL GIOCO)
+// 🔥 SCALA CORRETTA
 const SCALE = Math.min(canvas.width / 400, canvas.height / 800);
-
-const intro = document.getElementById("intro");
-const continueBtn = document.getElementById("continueBtn");
-
-const joystick = document.getElementById("joystick");
-const stick = document.getElementById("stick");
-const shootBtn = document.getElementById("shootBtn");
-const restartBtn = document.getElementById("restartBtn");
 
 let gameStarted=false, gameOver=false, victory=false;
 let inCastle=false;
@@ -209,7 +190,7 @@ setInterval(()=>{
  if(gameStarted && !gameOver && !levelComplete && !inCastle) spawnEnemy();
 },800);
 
-// boss spara
+// boss spara lento
 setInterval(()=>{
  if(inCastle && boss && !gameOver){
   bossBullets.push({
