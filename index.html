@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
@@ -102,25 +102,21 @@ const stick = document.getElementById("stick");
 const shootBtn = document.getElementById("shootBtn");
 const restartBtn = document.getElementById("restartBtn");
 
-// 🔥 SCALING FIX (UNICA MODIFICA)
-let SCALE = 1;
-
+// 🔥 UNICA MODIFICA (canvas + scala)
 function resizeCanvas(){
  canvas.width = window.innerWidth;
  canvas.height = window.innerHeight;
-
- SCALE = Math.min(canvas.width / 400, canvas.height / 800);
-
- player.r = 15 * SCALE;
 }
 window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
 
-// stato gioco
+const SCALE = Math.min(canvas.width / 400, canvas.height / 800);
+
 let gameStarted=false, gameOver=false, victory=false;
 let inCastle=false;
 
 // player
-let player = {x:0, y:0, r:15};
+let player = {x:canvas.width/2, y:canvas.height*0.7, r:15*SCALE};
 
 // vite
 let playerHits = 0;
@@ -133,7 +129,7 @@ let enemiesKilled=0;
 let levelComplete=false;
 
 // freccia
-let arrow = {x: 0, y: 80};
+let arrow = {x: canvas.width/2, y: 80};
 
 // nemici
 let enemies=[];
@@ -145,16 +141,7 @@ let rocks=[];
 // boss + ciccio
 let boss=null;
 let bossBullets=[];
-let ciccio = {x:0, y:150};
-
-// inizializza dimensioni corrette
-resizeCanvas();
-
-// centra player e freccia dopo resize iniziale
-player.x = canvas.width/2;
-player.y = canvas.height*0.7;
-arrow.x = canvas.width/2;
-ciccio.x = canvas.width/2;
+let ciccio = {x:canvas.width/2, y:150};
 
 // start
 continueBtn.onclick=()=>{
